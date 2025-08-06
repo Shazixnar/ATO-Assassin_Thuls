@@ -11,7 +11,7 @@ namespace AssassinThuls
     [BepInProcess("AcrossTheObelisk.exe")]
     public class Plugin : BaseUnityPlugin
     {
-        internal const int ModDate = 20250803;
+        internal const int ModDate = 20250806;
         private readonly Harmony harmony = new(PluginInfo.PLUGIN_GUID);
         internal static ManualLogSource Log;
         private void Awake()

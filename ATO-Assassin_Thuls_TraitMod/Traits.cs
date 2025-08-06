@@ -200,7 +200,7 @@ namespace TraitMod
                 }
                 else if (_type == "consume")
                 {
-                    if (!flag2)
+                    if (!flag)
                     {
                         if (__instance.TeamHaveTrait("shazixnarsilentfang"))
                         {
@@ -238,7 +238,15 @@ namespace TraitMod
         [HarmonyPrefix]
         public static void CastCard_Prefix(ref CardItem theCardItem, ref CardData _card)
         {
-            currentCard = theCardItem != null ? theCardItem.CardData : _card;
+            CardData _cardActive = theCardItem != null ? theCardItem.CardData : _card;
+
+            // 复制源代码中的过滤逻辑，确保 currentCard 是主动使用的牌
+            if (!_cardActive.AutoplayDraw &&
+                !_cardActive.AutoplayEndTurn &&
+                (_cardActive.CardClass != Enums.CardClass.Special || (_cardActive.CardClass == Enums.CardClass.Special && _cardActive.Playable)))
+            {
+                currentCard = _cardActive;
+            }
         }
 
         // 2. HealAuraCurse Patch
