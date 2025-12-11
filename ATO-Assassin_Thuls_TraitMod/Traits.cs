@@ -16,140 +16,240 @@ namespace TraitMod
 
         public static string[] myTraitList = { "shazixnarnightstalker", "shazixnarsilentfang", "shazixnarvenomousshade", "shazixnarvenomshadow" };
 
-        public static void myDoTrait(string _trait, ref Trait __instance)
+        private static readonly Traits _instance = new Traits();
+
+        public static void myDoTrait(
+            string trait,
+            Enums.EventActivation evt,
+            Character character,
+            Character target,
+            int auxInt,
+            string auxString,
+            CardData castedCard)
         {
-            // get info you may need
-            Enums.EventActivation _theEvent = Traverse.Create(__instance).Field("theEvent").GetValue<Enums.EventActivation>();
-            Character _character = Traverse.Create(__instance).Field("character").GetValue<Character>();
-            Character _target = Traverse.Create(__instance).Field("target").GetValue<Character>();
-            int _auxInt = Traverse.Create(__instance).Field("auxInt").GetValue<int>();
-            string _auxString = Traverse.Create(__instance).Field("auxString").GetValue<string>();
-            CardData _castedCard = Traverse.Create(__instance).Field("castedCard").GetValue<CardData>();
-            Traverse.Create(__instance).Field("character").SetValue(_character);
-            Traverse.Create(__instance).Field("target").SetValue(_target);
-            Traverse.Create(__instance).Field("theEvent").SetValue(_theEvent);
-            Traverse.Create(__instance).Field("auxInt").SetValue(_auxInt);
-            Traverse.Create(__instance).Field("auxString").SetValue(_auxString);
-            Traverse.Create(__instance).Field("castedCard").SetValue(_castedCard);
-            TraitData traitData = Globals.Instance.GetTraitData(_trait);
-            List<CardData> cardDataList = new List<CardData>();
-            List<string> heroHand = MatchManager.Instance.GetHeroHand(_character.HeroIndex);
-            Hero[] teamHero = MatchManager.Instance.GetTeamHero();
-            NPC[] teamNpc = MatchManager.Instance.GetTeamNPC();
+            switch(trait)
+            {
+                case "shazixnarnightstalker":
+                    _instance.shazixnarnightstalker(evt, character, target, auxInt, auxString, castedCard, trait);
+                    break;
+                    
+                case "shazixnarsilentfang":
+                    _instance.shazixnarsilentfang(evt, character, target, auxInt, auxString, castedCard, trait);
+                    break;
+
+                case "shazixnarvenomousshade":
+                    _instance.shazixnarvenomousshade(evt, character, target, auxInt, auxString, castedCard, trait);
+                    break;
+
+                case "shazixnarvenomshadow":
+                    _instance.shazixnarvenomshadow(evt, character, target, auxInt, auxString, castedCard, trait);
+                    break;
+            }
+        }
 
             // activate traits
-            if (_trait == "shazixnarnightstalker")
+        public void shazixnarnightstalker(
+            Enums.EventActivation evt,
+            Character character, Character target,
+            int auxInt, string auxString,
+            CardData castedCard, string trait)
+        {
+            // 0. 防御：如果 character 是 null，直接跳过
+            if (character == null) return;
+
+            // 1. 只在 BeginCombat 时触发初始化
+            if (evt == Enums.EventActivation.BeginCombat)
             {
-                _character.SetAuraTrait(_character, "stealth", 2);
+                // 设置2层潜行
+                character.SetAuraTrait(character, "stealth", 2);
 
+                // 计算次数
                 int traitNum = 2;
-                if (_character.HaveTrait("shazixnarvenomousshade")) traitNum += 2;
-                if (_character.HaveTrait("shazixnarshadowexecution")) traitNum += 2;
-                traitData.TimesPerTurn = traitNum;
+                if (character.HaveTrait("shazixnarvenomousshade")) traitNum += 2;
+                if (character.HaveTrait("shazixnarshadowexecution")) traitNum += 2;
 
-                if (_character.HeroItem != null)
+                // 初始化 activatedTraits
+                MatchManager.Instance.activatedTraits[trait] = 0;
+
+                // 显示提示
+                if (character.HeroItem != null)
                 {
-                    _character.HeroItem.ScrollCombatText(Texts.Instance.GetText("traits_shazixnarnightstalker", ""), Enums.CombatScrollEffectType.Trait);
-                    EffectsManager.Instance.PlayEffectAC("stealth", true, _character.HeroItem.CharImageT, false, 0f);
-                }
+                    character.HeroItem.ScrollCombatText(
+                        Texts.Instance.GetText("traits_shazixnarnightstalker", "")
+                        + Functions.TextChargesLeft(0, traitNum),
+                        Enums.CombatScrollEffectType.Trait
+                    );
 
-                MatchManager.Instance.activatedTraits["shazixnarnightstalker"] = 0;
-                
-                _character.HeroItem?.ScrollCombatText(
-                    Texts.Instance.GetText("traits_shazixnarnightstalker", "") +
-                    Functions.TextChargesLeft(0, traitNum),  // 初始化为0
-                    Enums.CombatScrollEffectType.Trait);
+                    EffectsManager.Instance.PlayEffectAC("stealth", true, character.HeroItem.CharImageT, false, 0f);
+                }
 
                 MatchManager.Instance.SetTraitInfoText();
                 return;
             }
 
-            else if (_trait == "shazixnarsilentfang")
+            // 2. 在 CastCard 时检测是否扣次数（或者是保留潜行）
+            if (evt == Enums.EventActivation.CastCard && castedCard != null)
             {
-                if (MatchManager.Instance != null && _castedCard != null)
-                {
-                    int traitNum = 6;
-                    if (_character.HaveTrait("shazixnarvenomshadow"))
-                    {
-                        traitNum += 2;
-                    }
-                    traitData.TimesPerTurn = traitNum;
+                // 判断是否技能/附魔
+                bool isSkill = castedCard.HasCardType(Enums.CardType.Skill);
+                bool isEnchant = castedCard.HasCardType(Enums.CardType.Enchantment);
 
-                    if (MatchManager.Instance.activatedTraits != null && MatchManager.Instance.activatedTraits.ContainsKey("shazixnarsilentfang") && MatchManager.Instance.activatedTraits["shazixnarsilentfang"] > traitNum)
+                if (isSkill || isEnchant)
+                {
+                    // 注意：不要在这里再初始化 ActivatedTraits
+                    // 因为 BeginCombat 里已经做过
+
+                    int used = MatchManager.Instance.activatedTraits[trait];
+                    int max = Globals.Instance.GetTraitData(trait).TimesPerTurn;
+
+                    if (used < max)
                     {
+                        // 触发效果：不消耗潜行 → 就不调用 HealAuraCurse
+                        MatchManager.Instance.activatedTraits[trait] = used + 1;
+
+                        // 显示更新
+                        character.HeroItem?.ScrollCombatText(
+                            Texts.Instance.GetText("traits_shazixnarnightstalker", "")
+                            + Functions.TextChargesLeft(used + 1, max),
+                            Enums.CombatScrollEffectType.Trait
+                        );
+
+                        MatchManager.Instance.SetTraitInfoText();
                         return;
                     }
-                    if (_castedCard.GetCardTypes().Contains(Enums.CardType.Small_Weapon) && _character.HeroData != null)
-                    {
-                        if (!MatchManager.Instance.activatedTraits.ContainsKey("shazixnarsilentfang"))
-                        {
-                            MatchManager.Instance.activatedTraits.Add("shazixnarsilentfang", 1);
-                        }
-                        else
-                        {
-                            Dictionary<string, int> activatedTraits = MatchManager.Instance.activatedTraits;
-                            activatedTraits["shazixnarsilentfang"] = activatedTraits["shazixnarsilentfang"] + 1;
-                        }
-                        float probability = 0.95f;
-                        if (_character.HaveTrait("shazixnarvenomshadow"))
-                        {
-                            probability = 0.9f;
-                        }
-                        string cardId = UnityEngine.Random.value < probability ? "silentfangnick" : "silentfangnickrare";
-                        MatchManager.Instance.GenerateNewCard(1, cardId, true, Enums.CardPlace.Hand, null, null, -1, true, 0);
-                        _character.HeroItem.ScrollCombatText(Texts.Instance.GetText("traits_shazixnarsilentfang", "") + Functions.TextChargesLeft(MatchManager.Instance.activatedTraits["shazixnarsilentfang"], traitNum), Enums.CombatScrollEffectType.Trait);
-                        MatchManager.Instance.SetTraitInfoText();
-                    }
                 }
-                return;
-            }
-
-            else if (_trait == "shazixnarvenomousshade")
-            {
-                if (MatchManager.Instance != null && _auxString == "stealth")
-                {
-                    NPC[] teamNPC = MatchManager.Instance.GetTeamNPC();
-                    for (int i = 0; i < teamNPC.Length; i++)
-                    {
-                        if (teamNPC[i] != null && teamNPC[i].Alive)
-                        {
-                            teamNPC[i].SetAuraTrait(_character, "poison", 5);
-                            _character.HeroItem.ScrollCombatText(Texts.Instance.GetText("traits_shazixnarvenomousshade", ""), Enums.CombatScrollEffectType.Trait);
-                        }
-                    }
-                }
-                return;
-            }
-
-            else if (_trait == "shazixnarvenomshadow")
-            {
-                if (_target != null && _target.Alive)
-                {
-                    _target.SetAuraTrait(_character, "poison", 1);
-                    _character.HeroItem.ScrollCombatText(Texts.Instance.GetText("traits_shazixnarvenomousshade", ""), Enums.CombatScrollEffectType.Trait);
-                }
-                return;
             }
         }
 
-        [HarmonyPrefix]
-        [HarmonyPatch(typeof(Trait), "DoTrait")]
-        public static bool DoTrait(Enums.EventActivation _theEvent, string _trait, Character _character, Character _target, int _auxInt, string _auxString, CardData _castedCard, ref Trait __instance)
+        public void shazixnarsilentfang(
+            Enums.EventActivation evt,
+            Character character, Character target,
+            int auxInt, string auxString,
+            CardData card, string trait)
         {
-            if ((UnityEngine.Object)MatchManager.Instance == (UnityEngine.Object)null)
-                return false;
-            Traverse.Create(__instance).Field("character").SetValue(_character);
-            Traverse.Create(__instance).Field("target").SetValue(_target);
-            Traverse.Create(__instance).Field("theEvent").SetValue(_theEvent);
-            Traverse.Create(__instance).Field("auxInt").SetValue(_auxInt);
-            Traverse.Create(__instance).Field("auxString").SetValue(_auxString);
-            Traverse.Create(__instance).Field("castedCard").SetValue(_castedCard);
-            if (Content.medsCustomTraitsSource.Contains(_trait) && myTraitList.Contains(_trait))
+            if (character == null || card == null) return;
+
+            // 只在使用卡牌时触发
+            if (evt != Enums.EventActivation.CastCard) return;
+
+            // 必须是小型武器
+            bool isSmallWeapon = card.GetCardTypes().Contains(Enums.CardType.Small_Weapon);
+            if (!isSmallWeapon) return;
+
+            // 必须是英雄
+            if (character.HeroData == null) return;
+
+            TraitData data = Globals.Instance.GetTraitData(trait);
+            int max = data.TimesPerTurn;
+
+            // 如果有 venomshadow，次数 +2
+            if (character.HaveTrait("shazixnarvenomshadow"))
+                max += 2;
+
+            // 读取已用次数
+            int used = 0;
+            if (MatchManager.Instance.activatedTraits.ContainsKey(trait))
+                used = MatchManager.Instance.activatedTraits[trait];
+
+            // 超过次数则不触发
+            if (used >= max) return;
+
+            // 更新次数
+            MatchManager.Instance.activatedTraits[trait] = used + 1;
+
+            // 判定概率
+            float probability = character.HaveTrait("shazixnarvenomshadow") ? 0.90f : 0.95f;
+            string cardId = UnityEngine.Random.value < probability ? "silentfangnick" : "silentfangnickrare";
+
+            // 生成卡牌
+            MatchManager.Instance.GenerateNewCard(1, cardId, true, Enums.CardPlace.Hand, null, null, -1, true, 0);
+
+            // combat text
+            character.HeroItem?.ScrollCombatText(
+                Texts.Instance.GetText("traits_shazixnarsilentfang", "")
+                + Functions.TextChargesLeft(used + 1, max),
+                Enums.CombatScrollEffectType.Trait);
+
+            MatchManager.Instance.SetTraitInfoText();
+        }
+
+        public void shazixnarvenomousshade(
+            Enums.EventActivation evt,
+            Character character, Character target,
+            int auxInt, string auxString,
+            CardData card, string trait)
+        {
+            if (character == null) return;
+
+            // 游戏内部判断获得 stealth 时，auxString = "stealth"
+            if (auxString != "stealth") return;
+
+            NPC[] npcs = MatchManager.Instance.GetTeamNPC();
+            foreach (var npc in npcs)
             {
-                myDoTrait(_trait, ref __instance);
-                return false;
+                if (npc != null && npc.Alive)
+                {
+                    npc.SetAuraTrait(character, "poison", 5);
+                }
             }
-            return true;
+
+            character.HeroItem?.ScrollCombatText(
+                Texts.Instance.GetText("traits_shazixnarvenomousshade", ""),
+                Enums.CombatScrollEffectType.Trait);
+        }
+
+        public void shazixnarvenomshadow(
+            Enums.EventActivation evt,
+            Character character, Character target,
+            int auxInt, string auxString,
+            CardData card, string trait)
+        {
+            if (character == null || target == null || !target.Alive) return;
+
+            // 通常是 Hitted 事件，你可按需限制 evt
+            target.SetAuraTrait(character, "poison", 1);
+
+            character.HeroItem?.ScrollCombatText(
+                Texts.Instance.GetText("traits_shazixnarvenomousshadow", ""), 
+                Enums.CombatScrollEffectType.Trait);
+        }
+
+        [HarmonyPatch(typeof(Trait), "DoTrait")]
+        public static class Trait_DoTrait_Patch
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(
+                Enums.EventActivation __0,   // theEvent
+                string __1,                  // trait id
+                Character __2,               // character
+                Character __3,               // target
+                int __4,                     // auxInt
+                string __5,                  // auxString
+                CardData __6,                // castedCard
+                Trait __instance)
+            {
+                string trait = __1;
+
+                // 如果是自定义 trait，就直接调用我们的逻辑
+                if (myTraitList.Contains(trait))
+                {
+                    myDoTrait(
+                        trait,
+                        __0,        // event
+                        __2,        // character
+                        __3,        // target
+                        __4,        // auxInt
+                        __5,        // auxString
+                        __6         // castedCard
+                    );
+
+                    // 返回 false = 阻止原版 DoTrait 执行
+                    return false;
+                }
+
+                // 否则走原版逻辑
+                return true;
+            }
         }
 
         public static string TextChargesLeft(int currentCharges, int chargesTotal)
