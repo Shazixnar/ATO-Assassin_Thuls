@@ -1,3 +1,11 @@
+# 1.0.4
+
+Fix a bug about **Venomshadow** and change the behave and sound of **Nick**.
+
+# 1.0.3
+
+Fix a bug.
+
 # 1.0.2
 
 Update for new game version.

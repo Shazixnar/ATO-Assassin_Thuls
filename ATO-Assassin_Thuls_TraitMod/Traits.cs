@@ -129,9 +129,6 @@ namespace TraitMod
         {
             if (character == null || card == null) return;
 
-            // 只在使用卡牌时触发
-            if (evt != Enums.EventActivation.CastCard) return;
-
             // 必须是小型武器
             bool isSmallWeapon = card.GetCardTypes().Contains(Enums.CardType.Small_Weapon);
             if (!isSmallWeapon) return;
@@ -140,11 +137,12 @@ namespace TraitMod
             if (character.HeroData == null) return;
 
             TraitData data = Globals.Instance.GetTraitData(trait);
-            int max = data.TimesPerTurn;
+            int max = 6;
 
             // 如果有 venomshadow，次数 +2
             if (character.HaveTrait("shazixnarvenomshadow"))
                 max += 2;
+                Globals.Instance.GetTraitData("shazixnarsilentfang").TimesPerTurn = max;
 
             // 读取已用次数
             int used = 0;
@@ -171,6 +169,8 @@ namespace TraitMod
                 Enums.CombatScrollEffectType.Trait);
 
             MatchManager.Instance.SetTraitInfoText();
+            MatchManager.Instance.ItemTraitActivated(true);
+            MatchManager.Instance.CreateLogCardModification(cardId, MatchManager.Instance.GetHero(character.HeroIndex));
         }
 
         public void shazixnarvenomousshade(
@@ -206,7 +206,6 @@ namespace TraitMod
         {
             if (character == null || target == null || !target.Alive) return;
 
-            // 通常是 Hitted 事件，你可按需限制 evt
             target.SetAuraTrait(character, "poison", 1);
 
             character.HeroItem?.ScrollCombatText(
